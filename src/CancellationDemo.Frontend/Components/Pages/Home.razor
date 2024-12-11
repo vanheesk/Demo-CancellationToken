@@ -1,0 +1,91 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Cancellation Demo</PageTitle>
+
+<div class="container">
+    <h1>Cancellation Demo</h1>
+
+    @if (isProcessing)
+    {
+        <div class="alert alert-info">
+            Processing...
+            <button class="btn btn-warning" @onclick="CancelOperation">Cancel</button>
+        </div>
+    }
+    else
+    {
+        <button class="btn btn-primary" @onclick="StartOperation">Start Long Operation</button>
+    }
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-@(success ? "success" : "danger")" role="alert">
+            @message
+        </div>
+    }
+</div>
+
+@code {
+    private bool isProcessing = false;
+    private string message = "";
+    private bool success = true;
+    private CancellationTokenSource? cts;
+
+    private async Task StartOperation()
+    {
+        try
+        {
+            isProcessing = true;
+            message = "";
+            cts = new CancellationTokenSource();
+
+            var client = HttpClientFactory.CreateClient("API");
+            var response = await client.GetAsync("api/processing/longrunning", cts.Token);
+
+            if (response.IsSuccessStatusCode)
+            {
+                success = true;
+                message = "Operation completed successfully!";
+            }
+            else if (response.StatusCode == (System.Net.HttpStatusCode)499)
+            {
+                success = false;
+                message = "Operation was cancelled.";
+            }
+            else
+            {
+                success = false;
+                message = $"Error: {response.StatusCode}";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            success = false;
+            message = "Operation was cancelled.";
+        }
+        catch (Exception ex)
+        {
+            success = false;
+            message = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+            cts?.Dispose();
+            cts = null;
+        }
+    }
+
+    private void CancelOperation()
+    {
+        cts?.Cancel();
+    }
+
+    public void Dispose()
+    {
+        cts?.Dispose();
+    }
+}

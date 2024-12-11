@@ -1,0 +1,6 @@
+@CancellationDemo.BFF_HostAddress = http://localhost:5274
+
+GET {{CancellationDemo.BFF_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
