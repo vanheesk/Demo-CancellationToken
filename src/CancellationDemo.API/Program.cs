@@ -14,6 +14,7 @@ builder.Services.AddSwaggerGen();
 // Add Application Insights
 builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddSingleton<ITelemetryInitializer>(sp => new CustomTelemetryInitializer());
+builder.Services.AddSingleton<ITelemetryInitializer>(sp => new DependencyTelemetryInitializer());
 
 var app = builder.Build();
 
@@ -36,9 +37,27 @@ public class CustomTelemetryInitializer : ITelemetryInitializer
     {
         if (telemetry is RequestTelemetry requestTelemetry)
         {
-            if (requestTelemetry.ResponseCode == "499")
+            if (requestTelemetry.ResponseCode == "499" 
+                || requestTelemetry.ResponseCode == "Canceled" )
             {
                 requestTelemetry.Success = true;
+            }
+        }
+    }
+}
+
+public class DependencyTelemetryInitializer : ITelemetryInitializer
+{
+    public void Initialize(ITelemetry telemetry)
+    {
+        if (telemetry is DependencyTelemetry dependencyTelemetry)
+        {
+            if (dependencyTelemetry.ResultCode == "499" ||
+                (dependencyTelemetry.Success == false && dependencyTelemetry.Properties.ContainsKey("handledAt") &&
+                 dependencyTelemetry.Properties["handledAt"] == "OperationCanceledException"))
+            {
+                dependencyTelemetry.Success = true;
+                dependencyTelemetry.Properties["handledAt"] = "OperationCanceledException";
             }
         }
     }

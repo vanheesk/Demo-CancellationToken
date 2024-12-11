@@ -17,7 +17,19 @@ builder.Services.AddReverseProxy()
     {
         transforms.AddRequestTransform(async context =>
         {
-            
+            if (context.HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                context.HttpContext.Response.StatusCode = 499;
+                context.HttpContext.Response.Headers.Add("X-Request-Cancelled", "true");
+            }
+        });
+        transforms.AddResponseTransform(async context =>
+        {
+            if (context.HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                context.HttpContext.Response.StatusCode = 499;
+                context.HttpContext.Response.Headers.Add("X-Request-Cancelled", "true");
+            }
         });
     });
 
