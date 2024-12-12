@@ -9,7 +9,13 @@ Since cancelling a request is pretty standard behaviour, it should also not be m
 ## Requirements
 
 * Azure Application Insights
+
+## Technology Stack
+
 * .NET 9
+* Blazor
+* YARP (acting as the BFF)
+* Web API
 
 ## Build & Run
 
