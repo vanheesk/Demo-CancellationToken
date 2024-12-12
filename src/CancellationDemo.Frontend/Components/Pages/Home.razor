@@ -1,5 +1,6 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JSRuntime
 
@@ -17,7 +18,7 @@
     }
     else
     {
-        <button class="btn btn-primary" @onclick="StartOperation">Start Long Operation</button>
+        <button class="btn btn-primary" @onclick="StartOperation" disabled="@(!isConnected)">Start Long Operation</button>
     }
 
     @if (!string.IsNullOrEmpty(message))
@@ -26,66 +27,101 @@
             @message
         </div>
     }
+
+    @if (!isConnected)
+    {
+        <div class="alert alert-warning" role="alert">
+            Connecting to server...
+        </div>
+    }
 </div>
 
 @code {
-    private bool isProcessing = false;
+    private bool isProcessing;
     private string message = "";
     private bool success = true;
     private CancellationTokenSource? cts;
+    private bool isConnected;
+    private bool isDisposed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isConnected = true;
+        await base.OnInitializedAsync();
+    }
 
     private async Task StartOperation()
     {
+        if (!isConnected || isDisposed) return;
+
         try
         {
             isProcessing = true;
             message = "";
+            cts?.Dispose();
             cts = new CancellationTokenSource();
 
-            var client = HttpClientFactory.CreateClient("API");
-            var response = await client.GetAsync("api/processing/longrunning", cts.Token);
+            using var client = HttpClientFactory.CreateClient("API");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "api/processing/longrunning");
 
-            if (response.IsSuccessStatusCode)
+            using var response = await client.SendAsync(request, cts.Token);
+
+            if (!isDisposed)
             {
-                success = true;
-                message = "Operation completed successfully!";
-            }
-            else if (response.StatusCode == (System.Net.HttpStatusCode)499)
-            {
-                success = false;
-                message = "Operation was cancelled.";
-            }
-            else
-            {
-                success = false;
-                message = $"Error: {response.StatusCode}";
+                if (response.IsSuccessStatusCode)
+                {
+                    success = true;
+                    message = "Operation completed successfully!";
+                }
+                else if (response.StatusCode == (System.Net.HttpStatusCode)499)
+                {
+                    success = false;
+                    message = "Operation was cancelled.";
+                }
+                else
+                {
+                    success = false;
+                    message = $"Error: {response.StatusCode}";
+                }
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (!isDisposed)
         {
             success = false;
             message = "Operation was cancelled.";
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!isDisposed)
         {
             success = false;
             message = $"Error: {ex.Message}";
         }
         finally
         {
-            isProcessing = false;
-            cts?.Dispose();
-            cts = null;
+            if (!isDisposed)
+            {
+                isProcessing = false;
+                await InvokeAsync(StateHasChanged);
+            }
         }
     }
 
     private void CancelOperation()
     {
-        cts?.Cancel();
+        if (!isDisposed)
+        {
+            cts?.Cancel();
+        }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        cts?.Dispose();
+        if (!isDisposed)
+        {
+            isDisposed = true;
+            isConnected = false;
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
+        }
     }
 }
