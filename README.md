@@ -1,4 +1,4 @@
-![Build Status](https://github.com/vanheesk/Demo-CancellationToken/actions/workflows/ci/badge.svg)
+![Build Status](https://github.com/vanheesk/Demo-CancellationToken/actions/workflows/ci.yml/badge.svg)
 
 # Demo on Cancellation of a pending request
 
